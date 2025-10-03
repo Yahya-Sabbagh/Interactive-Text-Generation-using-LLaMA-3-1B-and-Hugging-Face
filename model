@@ -1,0 +1,39 @@
+from transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig
+import torch
+from config import device, USE_CUDA
+
+# Model name
+model_name = "meta-llama/Llama-3.2-1B"
+
+# Load tokenizer and config
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+config = AutoConfig.from_pretrained(model_name)
+
+# Adjust rope scaling for longer sequences
+config.rope_scaling = {'type': 'linear', 'factor': 32.0}
+
+# Load the model
+model = AutoModelForCausalLM.from_pretrained(
+    model_name,
+    torch_dtype=torch.float16 if USE_CUDA else torch.float32,
+    device_map="auto" if USE_CUDA else None,
+    config=config
+).to(device)
+
+print(f" Model loaded on: {device}")
+
+# Chat function
+def chat(prompt, history=None, max_length=100, temperature=0.9, top_p=0.9):
+    inputs = tokenizer(prompt, return_tensors="pt").to(device)
+    with torch.no_grad():
+        output = model.generate(
+            **inputs,
+            max_length=max_length,
+            temperature=temperature,
+            top_p=top_p,
+            do_sample=True,
+            repetition_penalty=1.2
+        )
+    response = tokenizer.decode(output[0], skip_special_tokens=True)
+    print("Response:", response)
+    return response
