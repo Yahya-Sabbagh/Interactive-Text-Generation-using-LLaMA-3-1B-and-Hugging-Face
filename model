@@ -22,9 +22,22 @@ model = AutoModelForCausalLM.from_pretrained(
 
 print(f" Model loaded on: {device}")
 
-# Chat function
+# Updated chat function with conversation history
 def chat(prompt, history=None, max_length=100, temperature=0.9, top_p=0.9):
-    inputs = tokenizer(prompt, return_tensors="pt").to(device)
+    """
+    prompt: current user input
+    history: list of previous (user, bot) tuples
+    """
+    if history:
+        # Concatenate all previous interactions
+        conversation = ""
+        for user_msg, bot_msg in history:
+            conversation += f"User: {user_msg}\nBot: {bot_msg}\n"
+        conversation += f"User: {prompt}\nBot:"
+    else:
+        conversation = f"User: {prompt}\nBot:"
+
+    inputs = tokenizer(conversation, return_tensors="pt").to(device)
     with torch.no_grad():
         output = model.generate(
             **inputs,
@@ -33,6 +46,16 @@ def chat(prompt, history=None, max_length=100, temperature=0.9, top_p=0.9):
             top_p=top_p,
             do_sample=True,
             repetition_penalty=1.2
+        )
+    response = tokenizer.decode(output[0], skip_special_tokens=True)
+
+    # Extract only the new bot response
+    if "Bot:" in response:
+        response = response.split("Bot:")[-1].strip()
+
+    print("Bot response:", response)
+    return response
+
         )
     response = tokenizer.decode(output[0], skip_special_tokens=True)
     print("Response:", response)
